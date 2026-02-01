@@ -1,0 +1,506 @@
+================================================================================
+                    PONG GAME PROJECT DOCUMENTATION
+================================================================================
+
+PROJECT OVERVIEW:
+This is a Flutter-based Pong game that extends the classic Pong concept with
+additional features like destructible bricks, a golden bar power-up, and 
+brick-based scoring systems. The game features two paddles controlled by 
+keyboard input and real-time collision detection.
+
+================================================================================
+                            PROJECT STRUCTURE
+================================================================================
+
+lib/
+├── main.dart                  - Application entry point and UI
+├── models/
+│   ├── game_objects.dart      - All game object classes (Paddle, Ball, etc.)
+│   └── game_manager.dart      - Game logic and state management
+└── painters/
+    └── game_painter.dart      - Canvas rendering logic
+
+================================================================================
+                          CLASSES AND FUNCTIONS
+================================================================================
+
+FILE: lib/main.dart
+================================================================================
+
+CLASS: MyApp (extends StatelessWidget)
+Purpose: Root widget of the application
+Methods:
+  - build(BuildContext) → Widget
+    * Returns a MaterialApp with dark theme and PongGameScreen as home
+
+CLASS: PongGameScreen (extends StatefulWidget)
+Purpose: Creates the stateful widget for the game screen
+Methods:
+  - createState() → State<PongGameScreen>
+    * Returns the _PongGameScreenState
+
+CLASS: _PongGameScreenState (extends State with SingleTickerProviderStateMixin)
+Purpose: Manages the game screen state, input handling, and animation
+
+Properties:
+  - gameManager: GameManager
+    * Manages all game logic and objects
+  
+  - animationController: AnimationController
+    * Controls the animation loop (16ms per frame, ~60fps)
+  
+  - pressedKeys: Set<LogicalKeyboardKey>
+    * Tracks which keys are currently pressed
+  
+  - _initialized: bool
+    * Flag to track if the game has been initialized
+
+Methods:
+  - initState() → void
+    * Initializes the animation controller and sets up the animation loop
+    * Adds listener to update game state on each frame
+    * Schedules game initialization after first frame
+  
+  - initializeGame() → void
+    * Called after the first frame to get screen dimensions
+    * Creates a new GameManager with screen size
+    * Sets _initialized to true
+  
+  - handleInput() → void
+    * Called every frame to process keyboard input
+    * Checks for W/S keys (left paddle) and arrow keys (right paddle)
+    * Calls appropriate GameManager methods to move paddles
+  
+  - dispose() → void
+    * Cleans up the animation controller
+  
+  - build(BuildContext) → Widget
+    * Returns a Focus widget to capture keyboard input
+    * Sets up RawKeyDownEvent and RawKeyUpEvent handlers
+    * Space key toggles pause
+    * Renders game using CustomPaint with GamePainter
+    * Includes FloatingActionButtons for pause and reset
+
+Keyboard Controls:
+  - W: Move left paddle up
+  - S: Move left paddle down
+  - Arrow Up: Move right paddle up
+  - Arrow Down: Move right paddle down
+  - Space: Toggle pause/resume
+  - FloatingActionButton: Pause/Play (alternative to Space)
+  - FloatingActionButton: Reset game
+
+UI Display Elements (Top of Screen):
+  - Left score (cyan, 48pt): Positioned at top-left (20px from edge)
+  - Right score (orange, 48pt): Positioned at top-right (20px from edge)
+  - Brick count (white, 18pt): Positioned at top-center, shows current brick count
+  - Brick destruction scores (below the main scores, 20pt)
+
+================================================================================
+
+FILE: lib/models/game_objects.dart
+================================================================================
+
+CLASS: Paddle
+Purpose: Represents a player-controlled paddle
+
+Properties:
+  - x: double - X-coordinate position
+  - y: double - Y-coordinate position
+  - width: double - Width (default: 10)
+  - height: double - Height (default: 100)
+
+Constructor:
+  Paddle({required x, required y, width = 10, height = 100})
+
+Methods:
+  - moveUp() → void
+    * Moves paddle up by 15 pixels if not at top boundary
+  
+  - moveDown(double screenHeight) → void
+    * Moves paddle down by 15 pixels if not at bottom boundary
+  
+  - getRect() → Rect
+    * Returns a Rect object representing the paddle's bounding box
+
+
+CLASS: Ball
+Purpose: Represents the game ball with physics
+
+Properties:
+  - x: double - X-coordinate position
+  - y: double - Y-coordinate position
+  - velocityX: double - Horizontal velocity (default: 5)
+  - velocityY: double - Vertical velocity (default: 5)
+  - radius: double - Ball radius (default: 8)
+
+Constructor:
+  Ball({required x, required y, velocityX = 5, velocityY = 5, radius = 8})
+
+Methods:
+  - update(double screenWidth, double screenHeight) → void
+    * Updates ball position based on velocity
+    * Handles collision with top and bottom boundaries
+    * Reverses velocityY when hitting top or bottom
+    * Clamps ball position to prevent going through walls
+  
+  - getRect() → Rect
+    * Returns a Rect representing the ball's bounding box (circular)
+  
+  - reset(double screenWidth, double screenHeight) → void
+    * Resets ball to center of screen
+    * Slightly increases horizontal velocity for each reset
+    * Resets vertical velocity to 5
+
+
+CLASS: Brick
+Purpose: Represents a destructible brick that can have different shapes
+
+Properties:
+  - x: double - X-coordinate position
+  - y: double - Y-coordinate position
+  - width: double - Width (default: 60, varies by shape)
+  - height: double - Height (default: 20, varies by shape)
+  - shape: BrickShape - Determines visual appearance and collision behavior
+  - color: Color - Color of the brick (default: Colors.yellow)
+
+Constructor:
+  Brick({required x, required y, width = 60, height = 20, 
+         shape = BrickShape.square, color = Colors.yellow})
+
+Methods:
+  - getRect() → Rect
+    * Returns a Rect representing the brick's bounding box
+
+
+ENUM: BrickShape
+Values:
+  - square: 60x20 pixels
+  - verticalBar: 20x60 pixels
+  - horizontalBar: 80x15 pixels
+
+
+CLASS: GoldenBar
+Purpose: Special power-up that can be spawned when too many bricks are on field
+        Does not deflect the ball, but penalizes the player who hit it
+
+Properties:
+  - x: double - X-coordinate position
+  - y: double - Y-coordinate position
+  - width: double - Width (default: 15)
+  - height: double - Height (default: 60)
+  - velocityY: double - Vertical velocity for movement (default: 3.0)
+
+Constructor:
+  GoldenBar({required x, required y, width = 15, height = 60, velocityY = 3.0})
+
+Methods:
+  - update(double screenHeight) → void
+    * Updates position based on velocityY
+    * Bounces off top and bottom boundaries
+    * Reverses velocityY when hitting boundaries
+  
+  - getRect() → Rect
+    * Returns a Rect representing the golden bar's bounding box
+
+================================================================================
+
+FILE: lib/models/game_manager.dart
+================================================================================
+
+CLASS: GameManager
+Purpose: Central game logic controller that manages all game state, physics,
+         collision detection, and scoring. Supports multiple balls that spawn
+         automatically every minute to increase difficulty.
+
+Properties:
+  - leftPaddle: Paddle - Left player's paddle (blue)
+  - rightPaddle: Paddle - Right player's paddle (red)
+  - balls: List<Ball> - All active balls on screen (starts with 1, increases by 1 per minute)
+  - bricks: List<Brick> - All active bricks on screen
+  - goldenBar: GoldenBar? - Optional golden bar power-up
+  - leftScore: int - Points scored by left player (paddle points)
+  - rightScore: int - Points scored by right player (paddle points)
+  - leftBrickScore: int - Points earned by left player from destroyed bricks
+  - rightBrickScore: int - Points earned by right player from destroyed bricks
+  - gameRunning: bool - Whether the game is paused or running (default: true)
+  - lastPaddleHit: String - Tracks which paddle hit the ball ('left' or 'right')
+  - screenWidth: double - Width of the game screen
+  - screenHeight: double - Height of the game screen
+  - frameCount: int - Counter for frames (used for spawning timers)
+  - random: Random - For random brick spawning and golden bar behavior
+
+Constants:
+  - BRICK_SPAWN_DELAY: 300 frames (~5 seconds at 60fps) - initial delay before spawning bricks
+  - BRICK_SPAWN_INTERVAL: 120 frames (~2 seconds) - interval between brick spawns
+  - BALL_SPAWN_INTERVAL: 3600 frames (~60 seconds at 60fps) - interval for adding new balls
+
+Speed Limits:
+  - Minimum ball speed: 3.0 per velocity component
+  - Maximum ball speed: 15.0 per velocity component
+  - Minimum paddle speed: 15 pixels per frame
+  - Maximum paddle speed: 35 pixels per frame (15 + 20 clamp)
+
+Constructor:
+  GameManager({required screenWidth, required screenHeight})
+    * Initializes GameManager and calls initialize()
+
+Methods:
+  - initialize() → void
+    * Resets all game objects to starting positions
+    * Creates left and right paddles at center height
+    * **Creates a list with one ball at center of screen**
+    * Clears all bricks and golden bar
+    * Resets frameCount and lastPaddleHit
+  
+  - update() → void
+    * Main game loop, called every frame
+    * Returns early if game is paused
+    * Increments frameCount
+    * **Spawns additional ball every 3600 frames (~1 minute)**
+      - New balls spawn at center of screen
+      - Multiple balls increase difficulty exponentially
+    * **Updates paddle speeds dynamically based on average ball velocity**
+      - Base paddle speed: 15 pixels per frame
+      - Additional scaling: avgBallSpeed × 1.5 (clamped to 0-20)
+      - Result: Paddles move 15-35 pixels per frame based on average ball speed
+    * Spawns bricks at regular intervals (first brick at 300 frames, then every 120)
+    * **Updates all balls in a loop:**
+      * Updates each ball position and physics
+      * Checks and handles paddle collisions for each ball
+      * Bounces ball off paddles with angle adjustment
+      * Tracks which paddle last hit the ball
+    * Checks and handles golden bar collision:
+      * Awards 5 points to the player who hit it (by deducting 5 from opponent)
+      * Removes golden bar after collision
+    * Checks and handles brick collisions:
+      * Removes destroyed bricks
+      * Awards points to the player who hit the ball
+      * **Applies speed boost based on brick color with caps**
+      * Determines which side of brick was hit and bounces ball accordingly
+    * Spawns golden bar if more than 10 bricks are on screen
+    * Updates golden bar position if it exists
+    * Checks if each ball went out of bounds:
+      * Awards point to opposite player
+      * Removes ball from the game
+      * Awards point to opposite player
+      * Resets ball to center with increased velocity
+  
+  - spawnBall() → void
+    * Spawns a new ball at the center of the screen
+    * Called automatically every minute (3600 frames at 60fps)
+    * Increases difficulty by adding more objects to manage
+  
+  - spawnBrick() → void
+    * Spawns a new brick at a random location
+    * Randomly selects brick shape (square, verticalBar, horizontalBar)
+    * Randomly selects brick color from predefined palette
+    * Spawns bricks in 80% of screen width and 85% of screen height
+    * Prevents brick overlapping by checking up to 20 possible positions
+    * Only adds brick if valid non-overlapping position found
+  
+  - spawnGoldenBar() → void
+    * Spawns golden bar at horizontal center
+    * Vertical position is random
+    * Vertical velocity is random (3 or -3)
+  
+  - checkCollision(Rect rect1, Rect rect2) → bool
+    * Utility function to check if two rectangles overlap
+    * Returns true if rectangles overlap
+  
+  - _updatePaddleSpeeds() → void
+    * Updates both paddles' movement speed based on average ball velocity
+    * Calculates average speed of all balls on screen
+    * Calculation: baseSpeed(15) + (avgBallSpeed × 1.5) clamped to [0, 20]
+    * Results in paddle speeds between 15 and 35 pixels per frame
+    * Called every frame to dynamically adjust difficulty
+  
+  - _applyBrickSpeedBoost(Color brickColor) → void
+    * Applies a color-based speed multiplier to the ball
+    * Speed multipliers by color:
+      - Yellow: 1.05 (5% increase)
+      - Cyan: 1.08 (8% increase)
+      - Lime: 1.1 (10% increase)
+      - Orange: 1.12 (12% increase)
+      - Pink: 1.15 (15% increase)
+      - Purple: 1.2 (20% increase, highest)
+    * **Speed is capped at ±15.0 per velocity component to prevent runaway speeds**
+    * Ensures playability doesn't degrade even with many brick destructions
+  
+  - moveLeftPaddleUp() → void
+    * Moves left paddle up (called by input handler)
+  
+  - moveLeftPaddleDown() → void
+    * Moves left paddle down (called by input handler)
+  
+  - moveRightPaddleUp() → void
+    * Moves right paddle up (called by input handler)
+  
+  - moveRightPaddleDown() → void
+    * Moves right paddle down (called by input handler)
+  
+  - resetGame() → void
+    * Resets all scores to 0
+    * Resets brick scores to 0
+    * Sets gameRunning to true
+    * Calls initialize() to reset all objects
+  
+  - togglePause() → void
+    * Toggles gameRunning between true and false
+    * Pauses game if running, resumes if paused
+
+Collision Physics:
+  - Paddle collisions: Only occur if ball is moving toward the paddle
+  - Brick collisions: Determined by calculating overlap depth on each side
+  - Wall collisions: Ball bounces on top/bottom, resets score on left/right
+  - Golden bar: Doesn't deflect ball, just deducts points
+
+Scoring System:
+  - Paddle Score: +1 when opponent misses the ball
+  - Brick Score: +1 for each brick destroyed while your paddle last hit the ball
+  - Golden Bar: -5 points (minimum 0) if your paddle hit it while deflecting
+
+================================================================================
+
+FILE: lib/painters/game_painter.dart
+================================================================================
+
+CLASS: GamePainter (extends CustomPainter)
+Purpose: Renders all game objects and UI to the canvas
+
+Property:
+  - gameManager: GameManager - Reference to the game state
+
+Constructor:
+  GamePainter({required gameManager})
+
+Methods:
+  - paint(Canvas canvas, Size size) → void
+    * Main rendering method called for each frame
+    * Renders in this order:
+      1. Dark background (0xFF1a1a1a color)
+      2. Center dividing line (white dashed line)
+      3. Left paddle (blue rectangle)
+      4. Right paddle (red rectangle)
+      5. All bricks with colors and white borders
+      6. Golden bar if it exists (amber rectangle with yellow border)
+      7. Ball (white circle)
+      8. Left player score (cyan, 48pt, positioned at top-left)
+      9. Right player score (orange, 48pt, positioned at top-right)
+      10. **Brick count (white, 18pt, centered at top)**
+      11. Brick destruction scores (20pt, below main scores)
+      12. "PAUSED" text if game is not running (yellow, 32pt)
+  
+  - shouldRepaint(GamePainter oldDelegate) → bool
+    * Always returns true to ensure repainting every frame
+
+Rendering Details:
+  - Center line: 2px white line with 20px gap pattern
+  - Paddles: 10px wide, 100px tall
+  - Bricks: Variable size with 1px white stroke border
+  - Golden bar: 15px wide, 60px tall with special visual effect
+  - **Balls: 8px radius each (multiple balls rendered as list)**
+  - Player scores positioned at corners: top-left (20px) and top-right (20px)
+  - Brick count displayed at top center in smaller font (18pt)
+  - Pause text centered on screen
+
+================================================================================
+                            GAME FLOW SUMMARY
+================================================================================
+
+1. Application starts and creates MyApp which renders PongGameScreen
+2. PongGameScreen initializes AnimationController for 60fps game loop
+3. GameManager is created with screen dimensions
+4. Every 16ms (60fps), animation controller triggers setState() which:
+   - Calls gameManager.update() to process game logic
+   - Calls handleInput() to check for keyboard input
+5. Based on game state, GamePainter renders all objects to canvas
+6. Game continues in loop until user quits or resets
+
+Game Events:
+- Frame 0-299: Paddles can move, 1 ball bounces between paddles
+- Frame 300+: Bricks spawn every 120 frames at random locations
+- Frame 3600+: **Additional ball spawned every 3600 frames (~1 minute)**
+- Ball collision with brick: Destroys brick, bounces ball, awards points, may speed up ball
+- **Ball goes out of bounds: Awards point to opposite player, removes ball from game**
+- **Multiple balls increase difficulty: Player must track and react to multiple moving objects**
+- Golden bar spawns: When more than 10 bricks exist
+- Golden bar collision: **Awards 5 points to hitter by deducting from opponent**
+- Space/Pause button: Toggles pause state
+- Reset button: Resets all scores and objects
+
+================================================================================
+                           GAME MECHANICS
+================================================================================
+
+Ball Physics:
+- Ball moves continuously based on velocityX and velocityY
+- Ball bounces off paddles with angle adjustment based on hit location
+- Ball bounces off top and bottom walls
+- Ball resets and gives point when going past left/right edges
+- **Speed increases with each brick collision but is capped at ±15.0 per component**
+- Speed multipliers vary by brick color (5%-20% increase)
+- Paddle speed dynamically adjusts to match ball speed (range: 15-35 px/frame)
+
+Paddle Mechanics:
+- Paddles move at variable speed: 15-35 pixels per frame
+- Speed adjusts automatically based on ball velocity
+- Paddles bounded by screen height (can't go off-screen)
+- Left paddle (blue): W to move up, S to move down
+- Right paddle (red): Arrow Up to move up, Arrow Down to move down
+
+Brick Mechanics:
+- Bricks spawn randomly every 2 seconds after initial 5-second delay
+- Three different shapes with different dimensions
+- Six different colors selected randomly
+- Bricks don't overlap if possible (checks up to 20 random positions)
+- Ball bounce direction determined by which side of brick was hit
+- Points awarded to player whose paddle last hit the ball
+- **Color-based speed boost on destruction with caps to prevent runaway speed**
+
+Golden Bar Mechanic:
+- Spawns when 10+ bricks are on screen
+- Moves vertically with bouncing behavior
+- **Awards 5 points to the hitter by deducting 5 from opponent** (minimum 0 for opponent)
+- Doesn't deflect ball, removes itself after collision
+- Acts as a beneficial power-up for skilled players
+
+Scoring:
+- Paddle Score: Earned when opponent misses (ball goes past their paddle)
+- Brick Score: Earned when destroying bricks
+- Can't have negative scores (minimum is 0)
+
+Speed Management System:
+- **Brick Color Boost**: Each brick has a color-based multiplier
+  - Yellow: +5%, Cyan: +8%, Lime: +10%
+  - Orange: +12%, Pink: +15%, Purple: +20%
+  - All boosts are capped at ±15.0 per velocity component
+- **Paddle Speed Scaling**: Automatically adjusts based on ball speed
+  - Base: 15 pixels/frame, scales up to 35 pixels/frame max
+  - Increases by 1.5× the ball speed (clamped)
+  - Ensures playability remains consistent regardless of ball speed
+- **Speed Limits Prevent Unplayability**: 
+  - Game remains playable even after many brick destructions
+  - Ball never becomes too fast to react to
+  - Paddles can always keep up with the ball
+
+================================================================================
+                          TECHNICAL DETAILS
+================================================================================
+
+Framework: Flutter with Dart
+Rendering: CustomPaint with Canvas API
+Physics: Simple vector-based physics with collision detection
+Input: RawKeyboardListener for keyboard input
+Animation: AnimationController for game loop (16ms per frame)
+State Management: StatefulWidget with setState
+
+Performance Considerations:
+- shouldRepaint always returns true (repaints every frame)
+- Collision detection uses Rect.overlaps() for efficiency
+- Bricks checked against existing bricks to prevent overlap
+- Frame-based timing for spawning (predictable at 60fps)
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================
