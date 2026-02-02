@@ -502,5 +502,58 @@ Performance Considerations:
 - Frame-based timing for spawning (predictable at 60fps)
 
 ================================================================================
-                              END OF DOCUMENTATION
+                        FUTURE ENHANCEMENTS (PLANNED)
+================================================================================
+
+FEATURE 1: Network Multiplayer (Option 3 - Hybrid Approach)
+Purpose: Allow two players on different PCs to play together over LAN or internet
+Implementation: Hybrid model with local prediction + server validation
+Timeline: Future development phase
+Details:
+  - Local paddle input prediction for immediate responsiveness
+  - Periodic state synchronization (ball position, velocity)
+  - Server validates all scores and collisions
+  - Supports both LAN (~1-10ms latency) and Internet (~20-100ms latency)
+  - Estimated effort: 1-2 days for production-quality implementation
+Status: Design phase complete, awaiting implementation
+
+FEATURE 2: Android Mobile Version with Dual Control Options
+Purpose: Bring Pong gameplay to Android devices with innovative controls
+Timeline: Future development phase
+
+OPTION A: Tilt/Accelerometer Control
+  - Uses phone accelerometer sensors
+  - Intuitive tilt-to-move controls
+  - Map left/right tilt to paddle movement
+  - Works on all Android phones with accelerometer
+  - Still provides excellent brain training for coordination
+  - Estimated effort: 2-4 hours
+  - Flutter package: sensors 2.0+
+
+OPTION B: Eye Tracking Control (Advanced)
+  - Uses ML Kit Face Detection for real-time eye gaze tracking
+  - Hands-free, innovative gameplay
+  - Serves as eye health/awareness trainer
+  - Improves focus and gaze control
+  - Phone positioned at face level for optimal tracking
+  - Includes calibration screen for per-user accuracy
+  - Estimated effort: 8-10 hours for MVP
+  - Flutter packages: google_mlkit_face_detection, tflite_flutter
+  - Future expansion: Custom TensorFlow model for enhanced accuracy
+
+USER SELECTION MENU:
+  - Main screen presents both control options
+  - Users can switch between Tilt and Eye Tracking during gameplay
+  - Settings persist across sessions
+  - Each mode has its own calibration/setup
+
+HEALTH & ANALYTICS (Future Phase 3):
+  - Track eye movement patterns and focus time
+  - Eye fatigue detection
+  - Session analytics dashboard
+  - Brain training statistics (score progression, reaction times)
+  - Health insights and recommendations
+
+Status: Architecture planned, awaiting implementation
+
 ================================================================================
