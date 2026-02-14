@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import '../services/sound_manager.dart';
 
 class Paddle {
   double x;
@@ -61,10 +62,10 @@ class Ball {
     double? radius,
   }) : radius =
            radius ?? (Platform.isAndroid ? ANDROID_RADIUS : DEFAULT_RADIUS) {
-    // Adjust velocity for platform - make Android even slower
+    // Adjust velocity for platform - make Android much slower for playability
     if (Platform.isAndroid) {
-      velocityX *= 0.5; // Reduced from 0.7 to 0.5 for slower gameplay
-      velocityY *= 0.5;
+      velocityX *= 0.35; // Further reduced from 0.5 to 0.35
+      velocityY *= 0.35;
     } else if (Platform.isWindows) {
       velocityX *= 1.3; // Faster on Windows
       velocityY *= 1.3;
@@ -77,6 +78,7 @@ class Ball {
 
     // Bounce off top and bottom
     if (y - radius <= 0 || y + radius >= screenHeight) {
+      SoundManager().playWallHit();
       velocityY = -velocityY;
       y = y - radius <= 0 ? radius : screenHeight - radius;
     }

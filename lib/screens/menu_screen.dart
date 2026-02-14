@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../particles/particle_system.dart';
 import '../main.dart';
+import 'settings_screen.dart';
 
 enum GameModeSelection { menu, singlePlayer, twoPlayer }
 
@@ -163,6 +164,19 @@ class _MenuScreenState extends State<MenuScreen>
               ),
             ],
           ),
+          SizedBox(height: 10),
+          // Settings Button
+          _buildSmallButton(
+            label: '⚙ SETTINGS',
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            },
+            color: const Color(0xFF00FFFF),
+            isMobile: isMobile,
+            isCompactLandscape: isCompactLandscape,
+          ),
         ],
       );
     }
@@ -289,6 +303,19 @@ class _MenuScreenState extends State<MenuScreen>
               ),
             ],
           ),
+        SizedBox(height: isCompactLandscape ? 10 : (isMobile ? 20 : 30)),
+        // Settings Button
+        _buildSmallButton(
+          label: '⚙ SETTINGS',
+          onPressed: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+          },
+          color: const Color(0xFF00FFFF),
+          isMobile: isMobile,
+          isCompactLandscape: isCompactLandscape,
+        ),
         SizedBox(height: isCompactLandscape ? 10 : (isMobile ? 30 : 60)),
         // Footer text with effect
         if (!isLandscape)
@@ -366,6 +393,45 @@ class _MenuScreenState extends State<MenuScreen>
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmallButton({
+    required String label,
+    required VoidCallback onPressed,
+    required Color color,
+    required bool isMobile,
+    required bool isCompactLandscape,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompactLandscape ? 25 : (isMobile ? 20 : 30),
+          vertical: isCompactLandscape ? 8 : (isMobile ? 10 : 12),
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: color, width: 2),
+          color: Colors.black,
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.4),
+              blurRadius: 12,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: isCompactLandscape ? 14 : (isMobile ? 14 : 18),
+            fontWeight: FontWeight.bold,
+            color: color,
+            letterSpacing: 2,
+            shadows: [Shadow(blurRadius: 8, color: color)],
           ),
         ),
       ),

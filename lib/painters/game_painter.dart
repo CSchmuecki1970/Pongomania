@@ -125,7 +125,7 @@ class GamePainter extends CustomPainter {
             ),
           ),
           TextSpan(
-            text: ' (${gameManager.leftBrickScore})',
+            text: ' (${gameManager.leftBrickScore}/50)',
             style: const TextStyle(
               color: Colors.cyan,
               fontSize: 20,
@@ -152,7 +152,7 @@ class GamePainter extends CustomPainter {
             ),
           ),
           TextSpan(
-            text: ' (${gameManager.rightBrickScore})',
+            text: ' (${gameManager.rightBrickScore}/50)',
             style: const TextStyle(
               color: Colors.orange,
               fontSize: 20,

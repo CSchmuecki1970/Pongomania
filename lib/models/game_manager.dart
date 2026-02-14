@@ -4,6 +4,7 @@ import 'dart:io';
 import 'game_objects.dart';
 import 'ai_paddle.dart';
 import '../particles/particle_system.dart';
+import '../services/sound_manager.dart';
 
 enum GameMode { pong, shooter }
 
@@ -20,6 +21,8 @@ class GameManager {
   int rightBrickScore = 0; // Points from destroyed bricks
   bool gameRunning = true;
   GameMode gameMode = GameMode.pong;
+  bool gameOver = false;
+  String? winner; // 'left' or 'right'
   bool isSinglePlayer = false; // Single player mode flag
   late AIPaddle? aiPaddle; // AI opponent for single player
 
@@ -48,6 +51,10 @@ class GameManager {
   static const int WALL_SPAWN_MIN_INTERVAL = 2400; // ~40 seconds minimum
   static const int WALL_SPAWN_MAX_INTERVAL = 4800; // ~80 seconds maximum
   static const int GOLDEN_BAR_COOLDOWN = 3600; // 1 minute at 60fps
+  static const int BRICK_MILESTONE = 50; // Bricks needed for bonus goal points
+  static const int BRICK_MILESTONE_REWARD =
+      2; // Goal points awarded at milestone
+  static const int WINNING_SCORE = 10; // Goals needed to win
 
   late int nextWallSpawnTime; // Time when next wall should spawn
   int lastGoldenBarDestroyedFrame =
@@ -77,6 +84,12 @@ class GameManager {
     gameMode = GameMode.pong;
     leftFreezeFrames = 0;
     rightFreezeFrames = 0;
+    leftScore = 0;
+    rightScore = 0;
+    leftBrickScore = 0;
+    rightBrickScore = 0;
+    gameOver = false;
+    winner = null;
     particleSystem = ParticleSystem(
       screenWidth: screenWidth,
       screenHeight: screenHeight,
@@ -89,14 +102,14 @@ class GameManager {
 
     // Initialize AI if single player mode
     if (isSinglePlayer) {
-      aiPaddle = AIPaddle(
-        difficulty: 1.0,
-      ); // Maximum difficulty for most responsive AI
+      // Lower difficulty on Android for better playability
+      final aiDifficulty = Platform.isAndroid ? 0.6 : 0.85;
+      aiPaddle = AIPaddle(difficulty: aiDifficulty);
     }
   }
 
   void update() {
-    if (!gameRunning) return;
+    if (!gameRunning || gameOver) return;
 
     frameCount++;
 
@@ -187,8 +200,10 @@ class GameManager {
           if (checkCollision(sBall.getRect(), bricks[j].getRect())) {
             if (sBall.owner == 'left') {
               leftBrickScore++;
+              _checkBrickMilestone('left');
             } else {
               rightBrickScore++;
+              _checkBrickMilestone('right');
             }
 
             // Spawn particle effects at brick center
@@ -215,6 +230,7 @@ class GameManager {
     // In two player mode, it can split into 2 paddles based on ball count
     if (checkCollision(ball.getRect(), leftPaddle.getRect())) {
       if (ball.velocityX < 0) {
+        SoundManager().playPaddleHit();
         lastPaddleHit = 'left';
         ball.velocityX = -ball.velocityX;
         ball.x = leftPaddle.x + leftPaddle.width + ball.radius;
@@ -227,6 +243,7 @@ class GameManager {
     // In two player mode, it can split into 2 paddles based on ball count
     if (checkCollision(ball.getRect(), rightPaddle.getRect())) {
       if (ball.velocityX > 0) {
+        SoundManager().playPaddleHit();
         lastPaddleHit = 'right';
         ball.velocityX = -ball.velocityX;
         ball.x = rightPaddle.x - ball.radius;
@@ -249,11 +266,16 @@ class GameManager {
       if (checkCollision(ball.getRect(), brick.getRect())) {
         final brickRect = brick.getRect();
 
+        // Play brick explosion sound
+        SoundManager().playBrickExplosion();
+
         // Award points to the player who hit the ball last
         if (lastPaddleHit == 'left') {
           leftBrickScore++;
+          _checkBrickMilestone('left');
         } else {
           rightBrickScore++;
+          _checkBrickMilestone('right');
         }
 
         // Spawn particle effects at brick center
@@ -309,10 +331,16 @@ class GameManager {
     // Check if ball went out of bounds
     if (ball.x < 0) {
       rightScore++;
-      ball = Ball(x: screenWidth / 2, y: screenHeight / 2);
+      _checkWinCondition();
+      if (!gameOver) {
+        ball = Ball(x: screenWidth / 2, y: screenHeight / 2);
+      }
     } else if (ball.x > screenWidth) {
       leftScore++;
-      ball = Ball(x: screenWidth / 2, y: screenHeight / 2);
+      _checkWinCondition();
+      if (!gameOver) {
+        ball = Ball(x: screenWidth / 2, y: screenHeight / 2);
+      }
     }
 
     // Check ball-to-ball collisions and ensure minimum of 1 ball
@@ -441,33 +469,39 @@ class GameManager {
     // Higher ball speed = faster paddle movement
     // On Android: slower, more manageable speeds
     final avgBallSpeed = (ball.velocityX.abs() + ball.velocityY.abs()) / 2;
-    final maxPaddleSpeed = Platform.isAndroid ? 12.0 : 35.0;
-    final paddleSpeed = (8 + (avgBallSpeed * 0.5)).clamp(8.0, maxPaddleSpeed);
+    final maxPaddleSpeed = Platform.isAndroid ? 10.0 : 35.0;
+    final basePaddleSpeed = Platform.isAndroid ? 6.0 : 8.0;
+    final paddleSpeed = (basePaddleSpeed + (avgBallSpeed * 0.5)).clamp(
+      basePaddleSpeed,
+      maxPaddleSpeed,
+    );
     leftPaddle.setSpeed(paddleSpeed);
     rightPaddle.setSpeed(paddleSpeed);
   }
 
   void _applyBrickSpeedBoost(Ball ball, Color brickColor) {
     // Speed boost based on brick color
+    // Reduced multipliers on Android for better playability
     double speedMultiplier = 1.0;
+    final isAndroid = Platform.isAndroid;
 
     if (brickColor == Colors.yellow) {
-      speedMultiplier = 1.05; // 5% increase
+      speedMultiplier = isAndroid ? 1.02 : 1.05; // 2% on Android vs 5%
     } else if (brickColor == Colors.cyan) {
-      speedMultiplier = 1.08; // 8% increase
+      speedMultiplier = isAndroid ? 1.03 : 1.08; // 3% vs 8%
     } else if (brickColor == Colors.lime) {
-      speedMultiplier = 1.1; // 10% increase
+      speedMultiplier = isAndroid ? 1.04 : 1.1; // 4% vs 10%
     } else if (brickColor == Colors.orange) {
-      speedMultiplier = 1.12; // 12% increase
+      speedMultiplier = isAndroid ? 1.05 : 1.12; // 5% vs 12%
     } else if (brickColor == Colors.pink) {
-      speedMultiplier = 1.15; // 15% increase
+      speedMultiplier = isAndroid ? 1.06 : 1.15; // 6% vs 15%
     } else if (brickColor == Colors.purple) {
-      speedMultiplier = 1.2; // 20% increase
+      speedMultiplier = isAndroid ? 1.08 : 1.2; // 8% vs 20%
     }
 
     // Apply the speed boost with speed limits
-    // Reduced max speed cap for Android playability
-    final maxSpeed = Platform.isAndroid ? 8.0 : 15.0;
+    // Significantly reduced max speed cap for Android playability
+    final maxSpeed = Platform.isAndroid ? 5.0 : 15.0;
     const minSpeed = 3.0;
 
     ball.velocityX = (ball.velocityX * speedMultiplier)
@@ -715,12 +749,55 @@ class GameManager {
 
   // _ensurePlayerBalls removed: only one ball is supported
 
+  void _checkBrickMilestone(String player) {
+    int currentScore = player == 'left' ? leftBrickScore : rightBrickScore;
+
+    if (currentScore >= BRICK_MILESTONE) {
+      // Award bonus goal points
+      if (player == 'left') {
+        leftScore += BRICK_MILESTONE_REWARD;
+        leftBrickScore = 0; // Reset brick count
+      } else {
+        rightScore += BRICK_MILESTONE_REWARD;
+        rightBrickScore = 0; // Reset brick count
+      }
+
+      // Check if this caused a win
+      _checkWinCondition();
+    }
+  }
+
+  void _checkWinCondition() {
+    if (leftScore >= WINNING_SCORE) {
+      gameOver = true;
+      winner = 'left';
+      gameRunning = false;
+      if (isSinglePlayer) {
+        SoundManager().playPlayerWin();
+      } else {
+        SoundManager().playPlayerWin(); // Player 1 wins
+      }
+    } else if (rightScore >= WINNING_SCORE) {
+      gameOver = true;
+      winner = 'right';
+      gameRunning = false;
+      if (isSinglePlayer) {
+        SoundManager().playAIWin();
+      } else {
+        SoundManager()
+            .playPlayerWin(); // Player 2 wins (could use different sound)
+      }
+    }
+  }
+
   void resetGame() {
     leftScore = 0;
     rightScore = 0;
     leftBrickScore = 0;
     rightBrickScore = 0;
     gameRunning = true;
+    gameOver = false;
+    winner = null;
     initialize();
   }
 
